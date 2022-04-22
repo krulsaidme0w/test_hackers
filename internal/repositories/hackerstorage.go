@@ -1,38 +1,39 @@
 package repositories
 
 import (
-	"github.com/gomodule/redigo/redis"
-	"strconv"
+	"github.com/go-redis/redis/v8"
+	"golang.org/x/net/context"
 	"test_hackers/internal/core/domain"
 )
 
 type Storage struct {
-	conn redis.Conn
+	client *redis.Client
+	ctx    *context.Context
 }
 
-func NewStorage(conn redis.Conn) *Storage {
+func NewStorage(client *redis.Client, ctx *context.Context) *Storage {
 	return &Storage{
-		conn: conn,
+		client: client,
+		ctx:    ctx,
 	}
 }
 
 func (s Storage) GetAll() ([]domain.Hacker, error) {
-	resp, err := redis.Strings(s.conn.Do("ZRANGEBYSCORE", "hackers", "-INF", "+INF", "WITHSCORES"))
+	vals, err := s.client.ZRangeByScoreWithScores(*s.ctx, "hackers", &redis.ZRangeBy{
+		Min:    "-inf",
+		Max:    "+inf",
+		Offset: 0,
+		Count:  0,
+	}).Result()
 	if err != nil {
 		return []domain.Hacker{}, err
 	}
 
-	hackers := make([]domain.Hacker, 0, len(resp)/2)
-	for i := 0; i < len(resp); i = i + 2 {
-		name := resp[i]
-		score, err := strconv.Atoi(resp[i+1])
-		if err != nil {
-			return []domain.Hacker{}, err
-		}
-
+	hackers := make([]domain.Hacker, 0, len(vals))
+	for _, val := range vals {
 		hackers = append(hackers, domain.Hacker{
-			Name:  name,
-			Score: score,
+			Name:  val.Member.(string),
+			Score: val.Score,
 		})
 	}
 

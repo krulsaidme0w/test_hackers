@@ -1,25 +1,29 @@
 package main
 
 import (
+	"github.com/go-redis/redis/v8"
+	"golang.org/x/net/context"
 	"log"
 	"os"
+	pkg "test_hackers/pkg/storage"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gomodule/redigo/redis"
 
 	"test_hackers/internal/core/hackerservice"
 	"test_hackers/internal/handlers/hackerhandler"
 	"test_hackers/internal/repositories"
-	pkg "test_hackers/pkg/storage"
 )
 
+var ctx = context.Background()
+
 func main() {
-	conn, err := redis.Dial("tcp", os.Getenv("REDIS_ADDRESS"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	pkg.FillStorage(conn)
-	storage := repositories.NewStorage(conn)
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDRESS"),
+		Password: "",
+		DB:       0,
+	})
+	pkg.FillStorage(rdb, &ctx)
+	storage := repositories.NewStorage(rdb, &ctx)
 	service := hackerservice.NewService(storage)
 	handler := hackerhandler.NewHandler(service)
 
